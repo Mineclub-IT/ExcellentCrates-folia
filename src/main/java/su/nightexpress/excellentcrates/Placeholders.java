@@ -1,5 +1,8 @@
 package su.nightexpress.excellentcrates;
 
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import su.nightexpress.excellentcrates.api.crate.Reward;
 import su.nightexpress.excellentcrates.api.item.ItemProvider;
@@ -119,9 +122,7 @@ public class Placeholders extends su.nightexpress.nightcore.util.Placeholders {
             .add(CRATE_NAME, Crate::getName)
             .add(CRATE_DESCRIPTION, crate -> String.join("\n", crate.getDescription()))
             .add(CRATE_PERMISSION, Crate::getPermission)
-            .add(CRATE_OPEN_COST, crate -> {
-                return crate.getOpenCosts().stream().filter(Cost::isValid).map(Cost::format).collect(Collectors.joining(", "));
-            })
+            .add(CRATE_OPEN_COST, crate -> crate.getOpenCosts().stream().filter(Cost::isValid).map(Cost::format).collect(Collectors.joining(", ")))
             .add(CRATE_OPEN_COOLDOWN, crate -> {
                 if (crate.getOpenCooldown() == 0L) return Lang.OTHER_DISABLED.getString();
                 if (crate.getOpenCooldown() < 0L) return Lang.OTHER_ONE_TIMED.getString();
@@ -140,33 +141,40 @@ public class Placeholders extends su.nightexpress.nightcore.util.Placeholders {
             .add(CRATE_ITEM_STACKABLE, crate -> Lang.getYesOrNo(crate.isItemStackable()))
             .add(CRATE_PERMISSION_REQUIRED, crate -> Lang.getYesOrNo(crate.isPermissionRequired()))
             .add(CRATE_KEY_REQUIRED, crate -> Lang.getYesOrNo(crate.isKeyRequired()))
-            .add(CRATE_KEYS, crate -> {
-                return crate.getKeyIds().stream().map(id -> {
-                    CrateKey key = CratesAPI.getKeyManager().getKeyById(id);
-                    return key == null ? Lang.badEntry(id) : Lang.goodEntry(key.getName());
-                }).collect(Collectors.joining("\n"));
-            })
+            .add(CRATE_KEYS, crate -> crate.getKeyIds().stream().map(id -> {
+                CrateKey key = CratesAPI.getKeyManager().getKeyById(id);
+                return key == null ? Lang.badEntry(id) : Lang.goodEntry(key.getName());
+            }).collect(Collectors.joining("\n")))
             .add(CRATE_PUSHBACK_ENABLED, crate -> Lang.getEnabledOrDisabled(crate.isPushbackEnabled()))
             .add(CRATE_HOLOGRAM_ENABLED, crate -> Lang.getEnabledOrDisabled(crate.isHologramEnabled()))
             .add(CRATE_HOLOGRAM_TEMPLATE, Crate::getHologramTemplateId)
             .add(CRATE_HOLOGRAM_Y_OFFSET, crate -> NumberUtil.format(crate.getHologramYOffset()))
-            .add(CRATE_LOCATIONS, crate -> {
-                return crate.getBlockPositions().stream().map(worldPos -> {
-                    Block block = worldPos.toBlock();
-                    if (block == null) return Lang.badEntry("null");
+            .add(CRATE_LOCATIONS, crate -> crate.getBlockPositions().stream().map(worldPos -> {
+                World world = Bukkit.getWorld(worldPos.getWorldName());
+                if (world == null) return Lang.badEntry("null");
 
-                    String name = Tags.LIGHT_ORANGE.wrap(LangAssets.get(block.getType()));
+                String name;
+                Material material;
 
-                    String x = Tags.LIGHT_ORANGE.wrap(NumberUtil.format(worldPos.getX()));
-                    String y = Tags.LIGHT_ORANGE.wrap(NumberUtil.format(worldPos.getY()));
-                    String z = Tags.LIGHT_ORANGE.wrap(NumberUtil.format(worldPos.getZ()));
-                    String world = Tags.LIGHT_ORANGE.wrap(worldPos.getWorldName());
-                    String coords = x + ", " + y + ", " + z + " in " + world;
-                    String line = coords + " (" + name + ")";
+                try {
+                    Block block = world.getBlockAt(worldPos.getX(), worldPos.getY(), worldPos.getZ());
+                    material = block.getType();
+                    String blockName = LangAssets.get(material);
+                    name = !blockName.isEmpty() ? Tags.LIGHT_ORANGE.wrap(blockName) : Tags.LIGHT_ORANGE.wrap("Unknown Block");
+                } catch (IllegalStateException ignored) {
+                    name = Tags.LIGHT_ORANGE.wrap("Unknown Block");
+                    material = Material.AIR;
+                }
 
-                    return block.isEmpty() && !Config.isCrateInAirBlocksAllowed() ? Lang.badEntry(line) : Lang.goodEntry(line);
-                }).collect(Collectors.joining("\n"));
-            })
+                String x = Tags.LIGHT_ORANGE.wrap(NumberUtil.format(worldPos.getX()));
+                String y = Tags.LIGHT_ORANGE.wrap(NumberUtil.format(worldPos.getY()));
+                String z = Tags.LIGHT_ORANGE.wrap(NumberUtil.format(worldPos.getZ()));
+                String worldName = Tags.LIGHT_ORANGE.wrap(worldPos.getWorldName());
+                String coords = x + ", " + y + ", " + z + " in " + worldName;
+                String line = coords + " (" + name + ")";
+
+                return Lang.goodEntry(line);
+            }).collect(Collectors.joining("\n")))
             .add(CRATE_EFFECT_MODEL, crate -> StringUtil.capitalizeUnderscored(crate.getEffectType()))
             .add(CRATE_EFFECT_PARTICLE_NAME, crate -> {
                 UniParticle wrapped = crate.getEffectParticle();
@@ -181,34 +189,28 @@ public class Placeholders extends su.nightexpress.nightcore.util.Placeholders {
             .add(CRATE_PREVIEW_ID, Crate::getPreviewId);
     });
 
-    public static final PlaceholderList<Reward> REWARD = PlaceholderList.create(list -> {
-        list
-            .add(REWARD_ID, Reward::getId)
-            .add(REWARD_NAME, Reward::getName)
-            .add(REWARD_DESCRIPTION, reward -> String.join("\n", reward.getDescription()))
-            .add(REWARD_WEIGHT, reward -> NumberUtil.format(reward.getWeight()))
-            .add(REWARD_ROLL_CHANCE, reward -> NumberUtil.format(reward.getRollChance()))
-            .add("%reward_chance%", reward -> NumberUtil.format(reward.getWeight()))
-            .add("%reward_real_chance%", reward -> NumberUtil.format(reward.getRollChance()))
-            .add(REWARD_RARITY_NAME, reward -> reward.getRarity().getName())
-            .add("%reward_rarity_chance%", reward -> NumberUtil.format(reward.getRarity().getWeight()))
-            .add(REWARD_RARITY_WEIGHT, reward -> NumberUtil.format(reward.getRarity().getWeight()))
-            .add(REWARD_RARITY_ROLL_CHANCE, reward -> NumberUtil.format(reward.getRarity().getRollChance(reward.getCrate())))
-            .add("%reward_preview_name%", Reward::getName)
-            .add("%reward_preview_lore%", reward -> String.join("\n", reward.getDescription()));
-    });
+    public static final PlaceholderList<Reward> REWARD = PlaceholderList.create(list -> list
+        .add(REWARD_ID, Reward::getId)
+        .add(REWARD_NAME, Reward::getName)
+        .add(REWARD_DESCRIPTION, reward -> String.join("\n", reward.getDescription()))
+        .add(REWARD_WEIGHT, reward -> NumberUtil.format(reward.getWeight()))
+        .add(REWARD_ROLL_CHANCE, reward -> NumberUtil.format(reward.getRollChance()))
+        .add("%reward_chance%", reward -> NumberUtil.format(reward.getWeight()))
+        .add("%reward_real_chance%", reward -> NumberUtil.format(reward.getRollChance()))
+        .add(REWARD_RARITY_NAME, reward -> reward.getRarity().getName())
+        .add("%reward_rarity_chance%", reward -> NumberUtil.format(reward.getRarity().getWeight()))
+        .add(REWARD_RARITY_WEIGHT, reward -> NumberUtil.format(reward.getRarity().getWeight()))
+        .add(REWARD_RARITY_ROLL_CHANCE, reward -> NumberUtil.format(reward.getRarity().getRollChance(reward.getCrate())))
+        .add("%reward_preview_name%", Reward::getName)
+        .add("%reward_preview_lore%", reward -> String.join("\n", reward.getDescription())));
 
     public static final PlaceholderList<Reward> REWARD_EDITOR = PlaceholderList.create(list -> {
         list.add(REWARD);
         list
             .add(REWARD_BROADCAST, reward -> Lang.getYesOrNo(reward.isBroadcast()))
             .add(REWARD_PLACEHOLDER_APPLY, reward -> Lang.getYesOrNo(reward.isPlaceholderApply()))
-            .add(REWARD_IGNORED_PERMISSIONS, reward -> {
-                return String.join("\n", Lists.modify(reward.getIgnoredPermissions(), Lang::goodEntry));
-            })
-            .add(REWARD_REQUIRED_PERMISSIONS, reward -> {
-                return String.join("\n", Lists.modify(reward.getRequiredPermissions(), Lang::goodEntry));
-            })
+            .add(REWARD_IGNORED_PERMISSIONS, reward -> String.join("\n", Lists.modify(reward.getIgnoredPermissions(), Lang::goodEntry)))
+            .add(REWARD_REQUIRED_PERMISSIONS, reward -> String.join("\n", Lists.modify(reward.getRequiredPermissions(), Lang::goodEntry)))
             .add("%reward_inspect_content%", reward -> "");
 
         Inspectors.REWARD.addPlaceholders(list);
@@ -217,17 +219,13 @@ public class Placeholders extends su.nightexpress.nightcore.util.Placeholders {
     public static final PlaceholderList<ItemReward> ITEM_REWARD_EDITOR = PlaceholderList.create(list -> {
         list.add(REWARD_EDITOR);
         list.add(REWARD_CUSTOM_PREVIEW, reward -> Lang.getYesOrNo(reward.isCustomPreview()));
-        list.add(REWARD_ITEMS_CONTENT, reward -> {
-            return reward.getItems().stream().map(ItemProvider::getItemStack)
-                .map(item -> Lang.goodEntry(ItemUtil.getSerializedName(item) + " x" + item.getAmount())).collect(Collectors.joining("\n"));
-        });
+        list.add(REWARD_ITEMS_CONTENT, reward -> reward.getItems().stream().map(ItemProvider::getItemStack)
+            .map(item -> Lang.goodEntry(ItemUtil.getSerializedName(item) + " x" + item.getAmount())).collect(Collectors.joining("\n")));
     });
 
     public static final PlaceholderList<CommandReward> COMMAND_REWARD_EDITOR = PlaceholderList.create(list -> {
         list.add(REWARD_EDITOR);
-        list.add(REWARD_COMMANDS_CONTENT, reward -> {
-            return reward.getCommands().stream().map(Lang::goodEntry).collect(Collectors.joining("\n"));
-        });
+        list.add(REWARD_COMMANDS_CONTENT, reward -> reward.getCommands().stream().map(Lang::goodEntry).collect(Collectors.joining("\n")));
     });
 
     public static final PlaceholderList<LimitValues> LIMIT_VALUES = PlaceholderList.create(list -> list
@@ -245,9 +243,7 @@ public class Placeholders extends su.nightexpress.nightcore.util.Placeholders {
     public static final PlaceholderList<Milestone> MILESTONE = PlaceholderList.create(list -> list
         .add(MILESTONE_OPENINGS, milestone -> NumberUtil.format(milestone.getOpenings()))
         .add(MILESTONE_REWARD_ID, Milestone::getRewardId)
-        .add(MILESTONE_INSPECT_REWARD, milestone -> {
-            return milestone.getReward() == null ? Lang.badEntry("Invalid reward!") : Lang.goodEntry("Reward is correct.");
-        })
+        .add(MILESTONE_INSPECT_REWARD, milestone -> milestone.getReward() == null ? Lang.badEntry("Invalid reward!") : Lang.goodEntry("Reward is correct."))
     );
 
     public static final PlaceholderList<Rarity> RARITY = PlaceholderList.create(list -> list

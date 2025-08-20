@@ -4,12 +4,15 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MenuType;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 import su.nightexpress.excellentcrates.CratesPlugin;
 import su.nightexpress.excellentcrates.api.crate.Reward;
 import su.nightexpress.excellentcrates.crate.impl.Crate;
 import su.nightexpress.excellentcrates.crate.impl.CrateSource;
+import su.nightexpress.excellentcrates.util.HexUtils;
 import su.nightexpress.excellentcrates.util.InteractType;
 import su.nightexpress.nightcore.config.ConfigValue;
 import su.nightexpress.nightcore.config.FileConfig;
@@ -78,8 +81,6 @@ public class PreviewMenu extends LinkedMenu<CratesPlugin, CrateSource> implement
     public MenuFiller<Reward> createFiller(@NotNull MenuViewer viewer) {
         Player player = viewer.getPlayer();
         Crate crate = this.getLink(player).getCrate();
-        //CrateUser user = plugin.getUserManager().getUserData(player);
-        //CrateData crateData = user.getCrateData(crate);
 
         var autoFill = MenuFiller.builder(this);
 
@@ -112,30 +113,58 @@ public class PreviewMenu extends LinkedMenu<CratesPlugin, CrateSource> implement
                         .replace(PERSONAL_LIMITS, personal)
                         .apply(this.limitsLore));
                 }
-            }
-            else {
+            } else {
                 restrictions.addAll(this.noPermissionLore);
             }
 
-            return NightItem.fromItemStack(reward.getPreviewItem())
-                .ignoreNameAndLore()
-                .setDisplayName(this.rewardName)
-                .setLore(this.rewardLore)
-                .replacement(replacer -> {
-                        replacer
-                            .replace(LIMITS, limits)
-                            .replace(NO_PERMISSION, restrictions)
-                            .replace("%win_limit_amount%", limits)
-                            .replace("%win_limit_cooldown%", Collections.emptyList())
-                            .replace("%win_limit_drained%", Collections.emptyList())
-                            .replace("%win_limit_no_permission%", restrictions)
-                            .replace(reward.replacePlaceholders())
-                            .replace(crate.replacePlaceholders());
-                        if (this.applyPlaceholderAPI) {
-                            replacer.replacePlaceholderAPI(player);
-                        }
-                    }
-                );
+            // Base item from reward
+            ItemStack base = reward.getPreviewItem().clone();
+            ItemMeta meta = base.hasItemMeta() ? base.getItemMeta() : null;
+
+            // Original name & lore
+            String originalName = (meta != null && meta.hasDisplayName())
+                ? meta.getDisplayName()
+                : this.rewardName;
+
+            List<String> originalLore = (meta != null && meta.hasLore())
+                ? new ArrayList<>(meta.getLore())
+                : Collections.emptyList();
+
+            List<String> rewardLore = (this.rewardLore != null)
+                ? this.rewardLore
+                : Collections.emptyList();
+
+            // Merge lore
+            List<String> combinedLore = new ArrayList<>(originalLore);
+            combinedLore.addAll(rewardLore);
+
+            // Replace placeholders in name & lore
+            Replacer replacer = Replacer.create()
+                .replace(LIMITS, limits)
+                .replace(NO_PERMISSION, restrictions)
+                .replace("%win_limit_amount%", limits)
+                .replace("%win_limit_cooldown%", Collections.emptyList())
+                .replace("%win_limit_drained%", Collections.emptyList())
+                .replace("%win_limit_no_permission%", restrictions)
+                .replace(reward.replacePlaceholders())
+                .replace(crate.replacePlaceholders());
+
+            if (this.applyPlaceholderAPI) {
+                replacer.replacePlaceholderAPI(player);
+            }
+
+            String finalName = replacer.apply(originalName);
+            List<String> finalLore = replacer.apply(combinedLore);
+
+            // Apply to new ItemMeta
+            ItemMeta newMeta = base.getItemMeta();
+            if (newMeta != null) {
+                newMeta.setDisplayName(HexUtils.colour(finalName));
+                newMeta.setLore(HexUtils.colourList(finalLore));
+                base.setItemMeta(newMeta);
+            }
+
+            return NightItem.fromItemStack(base);
         });
 
         return autoFill.build();

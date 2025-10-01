@@ -502,6 +502,17 @@ public class CrateManager extends AbstractManager<CratesPlugin> {
     }
 
     public void giveReward(@NotNull Player player, @NotNull Reward reward) {
+        this.giveReward(player, reward, true);
+    }
+
+    public void giveReward(@NotNull Player player,
+                           @NotNull Reward reward,
+                           final boolean callEvent) {
+        if (callEvent) {
+            final CrateObtainRewardEvent event = new CrateObtainRewardEvent(reward, player);
+            this.plugin.getPluginManager().callEvent(event);
+            if (event.isCancelled()) return;
+        }
         reward.giveContent(player);
 
         Crate crate = reward.getCrate();
@@ -525,9 +536,6 @@ public class CrateManager extends AbstractManager<CratesPlugin> {
 
         this.addRollCount(player, reward);
         this.plugin.getCrateLogger().logReward(player, reward);
-
-        CrateObtainRewardEvent event = new CrateObtainRewardEvent(reward, player);
-        this.plugin.getPluginManager().callEvent(event);
     }
 
     public int getGlobalRollsLeft(@NotNull Reward reward) {
